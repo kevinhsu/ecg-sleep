@@ -1,5 +1,5 @@
 %% Configuration
-db = '/slpdb/slp04';
+db = '/slpdb/slp61';
 display(db);
 [~,config]=wfdbloadlib;
 echo off
@@ -111,12 +111,28 @@ P1 = P2(1:L/2+1);
 P1(2:end-1) = 2*P1(2:end-1);
 f = Fs*(0:(L/2))/L;
 [sortedP1,sortIndex] = sort(P1,'descend');
-rr.P11 = sortedP1(1);  % Pick the Top 3 Elements
-rr.P12 = sortedP1(2);
-rr.P13 = sortedP1(3);
-rr.freq1 = f(sortIndex(1));
-rr.freq2 = f(sortIndex(2));
-rr.freq3 = f(sortIndex(3));
+
+if numel(sortedP1) >= 1
+    rr.P11 = sortedP1(1);  % Pick the Top 3 Elements
+    rr.freq1 = f(sortIndex(1));
+else
+    rr.P11 = 0;
+    rr.freq1 = 0;
+end
+if numel(sortedP1) >= 2
+    rr.P12 = sortedP1(2);
+    rr.freq2 = f(sortIndex(2));
+else
+    rr.P12 = 0;
+    rr.freq2 = 0;
+end
+if numel(sortedP1) >= 3
+    rr.P13 = sortedP1(3);
+    rr.freq3 = f(sortIndex(3));
+else
+    rr.P13 = 0;
+    rr.freq3 = 0;
+end
 
 %% Rolling Time Window Feature Extraction
 display('Rolling Time Window Feature Extraction');
@@ -140,23 +156,45 @@ for i = 1:numTimeWindow
     
     % No Available Time Window
     if isempty(rrtw.hrv) || length(rrtw.hrv) == 1
-       rrtw.mean(i) = rrtw.mean(i-1);
-       rrtw.std(i) = rrtw.std(i-1);
-       rrtw.CV(i) = rrtw.CV(i-1);
-       rrtw.LF(i) = rrtw.LF(i-1);
-       rrtw.HF(i) = rrtw.HF(i-1);
-       rrtw.FreqmaxP(i) = rrtw.FreqmaxP(i-1);
-       rrtw.maxHFD(i) = rrtw.maxHFD(i-1);
-       rrtw.LFHFratio(i) = rrtw.LFHFratio(i-1);
-       rrtw.inter(i) = rrtw.inter(i-1);
-       rrtw.H(i) = rrtw.H(i-1);
-       rrtw.pval951(i) = rrtw.pval951(i-1);
-       rrtw.pval952(i) = rrtw.pval952(i-1);
-       rrtw.dfaslope(i) = rrtw.dfaslope(i-1);
-       rrtw.dfaintercept(i) = rrtw.dfaintercept(i-1);
-       rrtw.dfaslopeT(i) = rrtw.dfaslopeT(i-1);
-       rrtw.dfainterceptT(i) = rrtw.dfainterceptT(i-1);
-       continue;
+        if i ~= 1
+            rrtw.mean(i) = rrtw.mean(i-1);
+            rrtw.std(i) = rrtw.std(i-1);
+            rrtw.CV(i) = rrtw.CV(i-1);
+            rrtw.LF(i) = rrtw.LF(i-1);
+            rrtw.HF(i) = rrtw.HF(i-1);
+            rrtw.FreqmaxP(i) = rrtw.FreqmaxP(i-1);
+            rrtw.maxHFD(i) = rrtw.maxHFD(i-1);
+            rrtw.LFHFratio(i) = rrtw.LFHFratio(i-1);
+            rrtw.inter(i) = rrtw.inter(i-1);
+            rrtw.H(i) = rrtw.H(i-1);
+            rrtw.pval951(i) = rrtw.pval951(i-1);
+            rrtw.pval952(i) = rrtw.pval952(i-1);
+            rrtw.dfaslope(i) = rrtw.dfaslope(i-1);
+            rrtw.dfaintercept(i) = rrtw.dfaintercept(i-1);
+            rrtw.dfaslopeT(i) = rrtw.dfaslopeT(i-1);
+            rrtw.dfainterceptT(i) = rrtw.dfainterceptT(i-1);
+            
+        else
+            rrtw.mean(i) = 0;
+            rrtw.std(i) = 0;
+            rrtw.CV(i) = 0;
+            rrtw.LF(i) = 0;
+            rrtw.HF(i) = 0;
+            rrtw.FreqmaxP(i) = 0;
+            rrtw.maxHFD(i) = 0;
+            rrtw.LFHFratio(i) = 0;
+            rrtw.inter(i) = 0;
+            rrtw.H(i) = 0;
+            rrtw.pval951(i) = 0;
+            rrtw.pval952(i) = 0;
+            rrtw.dfaslope(i) = 0;
+            rrtw.dfaintercept(i) = 0;
+            rrtw.dfaslopeT(i) = 0;
+            rrtw.dfainterceptT(i) = 0;
+        end
+        
+        continue;
+        
     end
     
     % Normalize Time Series
@@ -182,8 +220,13 @@ for i = 1:numTimeWindow
         rrtw.dfaslope(i) = fitting(1);
         rrtw.dfaintercept(i) = fitting(2);
     else
-        rrtw.dfaslope(i) = rrtw.dfaslope(i-1);
-        rrtw.dfaintercept(i) = rrtw.dfaintercept(i-1);
+        if i ~= 1
+            rrtw.dfaslope(i) = rrtw.dfaslope(i-1);
+            rrtw.dfaintercept(i) = rrtw.dfaintercept(i-1);
+        else
+            rrtw.dfaslope(i) = 0;
+            rrtw.dfaintercept(i) = 0;
+        end
     end
     
     % Theoretical Detrended Fluctuation Analysis
@@ -192,8 +235,13 @@ for i = 1:numTimeWindow
         rrtw.dfaslopeT(i) = fitting(1);
         rrtw.dfainterceptT(i) = fitting(2);
     else
-        rrtw.dfaslopeT(i) = rrtw.dfaslopeT(i-1);
-        rrtw.dfainterceptT(i) = rrtw.dfainterceptT(i-1);
+        if i ~= 1
+            rrtw.dfaslopeT(i) = rrtw.dfaslopeT(i-1);
+            rrtw.dfainterceptT(i) = rrtw.dfainterceptT(i-1);
+        else
+            rrtw.dfaslopeT(i) = 0;
+            rrtw.dfainterceptT(i) = 0;
+        end
     end
     
     % Piecewise Detrended Fluctuation Analysis
@@ -213,15 +261,31 @@ for i = 1:numTimeWindow
     L = length(rrtw.hrv);
     P2 = abs(Yfft/L);
     P1 = P2(1:L/2+1);
-    P1(2:end-1) = 2*P1(2:end-1); 
+    P1(2:end-1) = 2*P1(2:end-1);
     f = Fs*(0:(L/2))/L;
     [sortedP1,sortIndex] = sort(P1,'descend');
-    rrtw.P11(i) = sortedP1(1);  % Pick the Top 3 Elements
-    rrtw.P12(i) = sortedP1(2);
-    rrtw.P13(i) = sortedP1(3);
-    rrtw.freq1(i) = f(sortIndex(1));
-    rrtw.freq2(i) = f(sortIndex(2));
-    rrtw.freq3(i) = f(sortIndex(3));
+    
+    if numel(sortedP1) >= 1
+        rrtw.P11(i) = sortedP1(1);  % Pick the Top 3 Elements
+        rrtw.freq1(i) = f(sortIndex(1));
+    else
+        rrtw.P11(i) = 0;
+        rrtw.freq1(i) = 0;
+    end
+    if numel(sortedP1) >= 2
+        rrtw.P12(i) = sortedP1(2);
+        rrtw.freq2(i) = f(sortIndex(2));
+    else
+        rrtw.P12(i) = 0;
+        rrtw.freq2(i) = 0;
+    end
+    if numel(sortedP1) >= 3
+        rrtw.P13(i) = sortedP1(3);
+        rrtw.freq3(i) = f(sortIndex(3));
+    else
+        rrtw.P13(i) = 0;
+        rrtw.freq3(i) = 0;
+    end
     
 end
 
@@ -248,7 +312,7 @@ display('Label Extraction');
 for i = 1:length(comments)
     C = char(comments{i});
     switch C(1)
-        case 'W'  
+        case 'W'
             S = -1;  % Subject is awake
         case 'R'
             S = 0;   % REM sleep
@@ -262,12 +326,12 @@ for i = 1:length(comments)
             S = 4;   % Sleep stage 4
         otherwise
             S = -1;  % Other status
-    end 
+    end
     
     rrtw.labels(i) = S;
     
     switch C(1)
-        case 'W'  
+        case 'W'
             S = -1;  % Subject is awake
         case 'R'
             S = 1;   % REM sleep
@@ -283,7 +347,7 @@ for i = 1:length(comments)
             S = -1;  % Other status
     end
     
-    rrtw.binarylabels(i) = S; 
+    rrtw.binarylabels(i) = S;
 end
 
 rrtw.labels =  rrtw.labels';
@@ -412,7 +476,7 @@ for i = 1:length(u)
     end
     if u(i) == binarylabels(i)
         count = count + 1;
-    end    
+    end
 end
 
 kmeansbinarymisclass2 = (length(u) - count) ./ length(u);
