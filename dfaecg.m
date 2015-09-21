@@ -50,8 +50,8 @@ if max(size(d)) == 1,
         dv(i-N0+1) = length(divisors(i,dmin));
     end
     OptN = N0 + find(max(dv)==dv) - 1;
-    OptN = OptN(1);
     % Use the first OptN values of x for further analysis
+    OptN = OptN(1);
     x = x(1:OptN);
     % Find the divisors of x
     d = divisors(OptN,dmin);
@@ -89,7 +89,7 @@ else
 end
 
 % Display and plot results if no output arguments are specified
-if nargout > 0,
+if nargout < 1,
     % Display results
     disp('---------------------------------------------------------------')
     disp(['DFA using ' num2str(length(d)) ' divisors (' num2str(d(1)) ',...,' num2str(d(length(d))) ...

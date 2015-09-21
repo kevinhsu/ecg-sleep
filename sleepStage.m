@@ -5,24 +5,26 @@ db3 = '/slpdb/slp01b';
 db4 = '/slpdb/slp04';
 
 %% Configuration
-db = db1;
+db = db3;
+display(db);
 [~,config]=wfdbloadlib;
-echo on
+echo off
+warning off
 
 %% Load ECG Signal
-display('Reading samples ECG signal from MIT-BIH Arrhythmia Database')
+display('Reading samples ECG signal from MIT-BIH Arrhythmia Database');
 [siginfo,Fs] = wfdbdesc(db);
-Fs = Fs(1);
+Fs = Fs(1); % Sampling Frequency
 [tm, signal]=rdsamp(db,1);
 ecg = signal(:,1);
 ecg = cmddenoise(ecg,'db1',4); % Wavelet Shrinkage Denoise
 ecg = ecg';
-[N,~] = size(ecg);
+N = length(ecg);
 figure
 plot(tm,ecg);hold on
 
 %% Peak Detection
-display('Reading and plotting annotations (human labels) of QRS complexes performend on the signals')
+display('Reading and plotting annotations (human labels) of QRS complexes performend on the signals');
 sortecg = sort(ecg,'descend');
 thresholdratio = 0.5;
 threshold = thresholdratio * mean(sortecg(1:round(N/Fs)));  %Only one R-wave in one sampling point
@@ -30,19 +32,27 @@ threshold = thresholdratio * mean(sortecg(1:round(N/Fs)));  %Only one R-wave in 
 plot(locs, peaks, 'ro');
 
 %% Convert ECG to HRV
-[m,n] = size(locs);
+display('Converting ECG to HRV');
+m = length(locs);
 hrv = locs(2:m) - locs(1:(m-1));
 figure
 plot(locs(2:m), hrv)
 
 %% Filter Outlier
+display('Filtering Outlier');
 [hrv,locs] = filterOutlier(hrv,locs);
+figure
+plot(locs, hrv);
 
 %% Global Feature Extraction
-rr.locs = locs;
-rr.hrv = hrv;
+display('Global Feature Extraction');
+% Time Series
+rr.locs = locs';
+rr.hrv = hrv';
 rr.dethrv = detrend(rr.hrv);
 rr.nolhrv = zscore(rr.hrv);
+
+% Statistical Feature Extraction
 rr.mean = mean(rr.hrv);
 rr.std = std(rr.hrv);
 rr.CV = rr.std / rr.mean;
@@ -63,38 +73,92 @@ line([0.4 0.4], [0 .1], 'Color',[.8 .8 .8]);
 rr.H = H;
 rr.pval951 = pval95(1);
 rr.pval952 = pval95(2);
-fitting = polyfit(log10(d),log10(p),1);
-rr.dfaslope = fitting(1);
-rr.dfaintercept = fitting(2);
-
-% Piecewise Detrended Fluctuation Analysis
-[rr.alpha1, rr.alpha2, rr.alpha3] = dfapiece(d,p);
+if ~isempty(d) && ~isempty(p)
+    fitting = polyfit(log10(d),log10(p),1);
+    rr.dfaslope = fitting(1);
+    rr.dfaintercept = fitting(2);
+end
 
 % Theoretical Detrended Fluctuation Analysis
-fitting = polyfit(log10(d),log10((d.^(0.5))/(d(1)^(0.5)/p(1))),1);
-rr.dfaslopeT = fitting(1);
-rr.dfainterceptT = fitting(2);
+if ~isempty(d) && ~isempty(p)
+    fitting = polyfit(log10(d),log10((d.^(0.5))/(d(1)^(0.5)/p(1))),1);
+    rr.dfaslopeT = fitting(1);
+    rr.dfainterceptT = fitting(2);
+end
+
+% Piecewise Detrended Fluctuation Analysis
+if length(d) > 1
+    [rr.alpha1, rr.alpha2, rr.alpha3] = dfapiece(d,p);
+else
+    rr.alpha1 = 0;
+    rr.alpha2 = 0;
+    rr.alpha3 = 0;
+end
+
+% Fast Fourier Transformation
+Yfft = fft(rr.hrv);
+L = length(rr.hrv);
+P2 = abs(Yfft/L);
+P1 = P2(1:L/2+1);
+P1(2:end-1) = 2*P1(2:end-1);
+f = Fs*(0:(L/2))/L;
+[sortedP1,sortIndex] = sort(P1,'descend');
+rr.P11 = sortedP1(1);  % Pick the Top 3 Elements
+rr.P12 = sortedP1(2);
+rr.P13 = sortedP1(3);
+rr.freq1 = f(sortIndex(1));
+rr.freq2 = f(sortIndex(2));
+rr.freq3 = f(sortIndex(3));
 
 %% Rolling Time Window Feature Extraction
+display('Rolling Time Window Feature Extraction');
 [ann,type,subtype,chan,num,comments]=rdann(db,'st',[],N);
-[numTimeWindow,~] = size(comments);
+numTimeWindow = length(comments);
 timeWindow = floor(N ./ numTimeWindow);
 
 for i = 1:numTimeWindow
-    % Time Series
-    for 
-    % rrtw.hrv = rr.hrv((timeWindow * (i-1) + 1):(timeWindow * i));
-    % rrtw.locs = rr.locs((timeWindow * (i-1) + 1):(timeWindow * i));
+    % Time Series and Time Window
+    rrtw.hrv = [];
+    rrtw.locs = [];
+    for j = 1:length(rr.locs)
+        if (rr.locs(j) >= tm(timeWindow * (i-1) + 1)) && (rr.locs(j) < tm(timeWindow * i)) % 30s, 60s, 90s, 120s
+            rrtw.hrv(end + 1) = rr.hrv(j);
+            rrtw.locs(end + 1) = rr.locs(j);
+        end
+    end
+    
+    rrtw.hrv = rrtw.hrv';
+    rrtw.locs = rrtw.locs';
+    
+    % No Available Time Window
+    if isempty(rrtw.hrv)
+       rrtw.mean(i) = rrtw.mean(i-1);
+       rrtw.std(i) = rrtw.std(i-1);
+       rrtw.CV(i) = rrtw.CV(i-1);
+       rrtw.LF(i) = rrtw.LF(i-1);
+       rrtw.HF(i) = rrtw.HF(i-1);
+       rrtw.FreqmaxP(i) = rrtw.FreqmaxP(i-1);
+       rrtw.maxHFD(i) = rrtw.maxHFD(i-1);
+       rrtw.LFHFratio(i) = rrtw.LFHFratio(i-1);
+       rrtw.inter(i) = rrtw.inter(i-1);
+       rrtw.H(i) = rrtw.H(i-1);
+       rrtw.pval951(i) = rrtw.pval951(i-1);
+       rrtw.pval952(i) = rrtw.pval952(i-1);
+       rrtw.dfaslope(i) = rrtw.dfaslope(i-1);
+       rrtw.dfaintercept(i) = rrtw.dfaintercept(i-1);
+       rrtw.dfaslopeT(i) = rrtw.dfaslopeT(i-1);
+       rrtw.dfainterceptT(i) = rrtw.dfainterceptT(i-1);
+       continue;
+    end
+    
+    % Normalize Time Series
     rrtw.dethrv = detrend(rrtw.hrv);
     rrtw.nolhrv = zscore(rrtw.hrv);
-    figure
-    plot(rrtw.locs, rrtw.hrv);
-    break;
     
-    % Feature Extraction
+    % Statistical Feature Extraction
     rrtw.mean(i) = mean(rrtw.hrv);
     rrtw.std(i) = std(rrtw.hrv);
-    rrtw.CV(i) = rrtw.std / rrtw.mean;
+    rrtw.CV(i) = rrtw.std(i) ./ rrtw.mean(i);
     
     % Power Spectrum Density
     [rrtw.psd, rrtw.w] = periodogram(rrtw.dethrv, hamming(length(rrtw.dethrv)));
@@ -105,25 +169,192 @@ for i = 1:numTimeWindow
     rrtw.H(i) = H;
     rrtw.pval951(i) = pval95(1);
     rrtw.pval952(i) = pval95(2);
-    fitting = polyfit(log10(d),log10(p),1);
-    rrtw.dfaslope(i) = fitting(1);
-    rrtw.dfaintercept(i) = fitting(2);
-    
-    % Piecewise Detrended Fluctuation Analysis
-    [rr.alpha1(i), rr.alpha2(i), rr.alpha3(i)] = dfapiece(d,p);
+    if ~isempty(d) && ~isempty(p)
+        fitting = polyfit(log10(d),log10(p),1);
+        rrtw.dfaslope(i) = fitting(1);
+        rrtw.dfaintercept(i) = fitting(2);
+    else
+        rrtw.dfaslope(i) = rrtw.dfaslope(i-1);
+        rrtw.dfaintercept(i) = rrtw.dfaintercept(i-1);
+    end
     
     % Theoretical Detrended Fluctuation Analysis
-    fitting = polyfit(log10(d),log10((d.^(0.5))/(d(1)^(0.5)/p(1))),1);
-    rrtw.dfaslopeT(i) = fitting(1);
-    rrtw.dfainterceptT(i) = fitting(2);
+    if ~isempty(d) && ~isempty(p)
+        fitting = polyfit(log10(d),log10((d.^(0.5))/(d(1)^(0.5)/p(1))),1);
+        rrtw.dfaslopeT(i) = fitting(1);
+        rrtw.dfainterceptT(i) = fitting(2);
+    else
+        rrtw.dfaslopeT(i) = rrtw.dfaslopeT(i-1);
+        rrtw.dfainterceptT(i) = rrtw.dfainterceptT(i-1);
+    end
+    
+    % Piecewise Detrended Fluctuation Analysis
+    if length(d) > 1
+        [rrtw.alpha1(i), rrtw.alpha2(i), rrtw.alpha3(i)] = dfapiece(d,p);
+    else
+        rrtw.alpha1(i) = 0;
+        rrtw.alpha2(i) = 0;
+        rrtw.alpha3(i) = 0;
+    end
+    
+    % Fast Fourier Transformation
+    Yfft = fft(rrtw.hrv);
+    L = length(rrtw.hrv);
+    P2 = abs(Yfft/L);
+    P1 = P2(1:L/2+1);
+    P1(2:end-1) = 2*P1(2:end-1); 
+    f = Fs*(0:(L/2))/L;
+    [sortedP1,sortIndex] = sort(P1,'descend');
+    rrtw.P11(i) = sortedP1(1);  % Pick the Top 3 Elements
+    rrtw.P12(i) = sortedP1(2);
+    rrtw.P13(i) = sortedP1(3);
+    rrtw.freq1(i) = f(sortIndex(1));
+    rrtw.freq2(i) = f(sortIndex(2));
+    rrtw.freq3(i) = f(sortIndex(3));
+    
 end
 
+% Clear rrtw Signal
+rrtw.hrv = [];
+rrtw.locs = [];
+rrtw.dethrv = [];
+rrtw.nolhrv = [];
+rrtw.psd = [];
+rrtw.w = [];
 
-%% Cross Validation
-% Load Sleep Stage ann
+% Clear rr Signal
+rr.hrv = [];
+rr.locs = [];
+rr.dethrv = [];
+rr.nolhrv = [];
+rr.psd = [];
+rr.w = [];
 
 
+%% Label Extraction
+display('Label Extraction');
+% Load Sleep Stage Annotations
+for i = 1:length(comments)
+    C = char(comments{i});
+    switch C(1)
+        case 'W'  
+            S = -1;  % Subject is awake
+        case 'R'
+            S = 0;   % REM sleep
+        case '1'
+            S = 1;   % Sleep stage 1
+        case '2'
+            S = 2;   % Sleep stage 2
+        case '3'
+            S = 3;   % Sleep stage 3
+        case '4'
+            S = 4;   % Sleep stage 4
+        otherwise
+            S = -1;  % Other status
+    end 
+    
+    rrtw.labels(i) = S;
+    
+    switch C(1)
+        case 'W'  
+            S = -1;  % Subject is awake
+        case 'R'
+            S = 1;   % REM sleep
+        case '1'
+            S = 1;   % Sleep stage 1
+        case '2'
+            S = 1;   % Sleep stage 2
+        case '3'
+            S = 1;   % Sleep stage 3
+        case '4'
+            S = 1;   % Sleep stage 4
+        otherwise
+            S = -1;  % Other status
+    end
+    
+    rrtw.binarylabels(i) = S; 
+end
 
+rrtw.labels =  rrtw.labels';
+rrtw.binarylabels = rrtw.binarylabels';
+
+%% k-folds Cross Validation
+display('k-folds Cross Validation');
+globalfeatures = [];
+features = [];
+labels = [];
+binarylabels = [];
+
+% Global Features: Used to match the most similar patient in database
+globalfeatures(1:numTimeWindow,1) = rr.mean';
+globalfeatures(1:numTimeWindow,2) = rr.std';
+globalfeatures(1:numTimeWindow,3) = rr.CV';
+globalfeatures(1:numTimeWindow,4) = rr.LF';
+globalfeatures(1:numTimeWindow,5) = rr.HF';
+globalfeatures(1:numTimeWindow,6) = rr.FreqmaxP';
+globalfeatures(1:numTimeWindow,7) = rr.maxHFD';
+globalfeatures(1:numTimeWindow,8) = rr.LFHFratio';
+globalfeatures(1:numTimeWindow,9) = rr.inter';
+globalfeatures(1:numTimeWindow,10) = rr.H';
+globalfeatures(1:numTimeWindow,11) = rr.pval951';
+globalfeatures(1:numTimeWindow,12) = rr.pval952';
+globalfeatures(1:numTimeWindow,13) = rr.dfaslope';
+globalfeatures(1:numTimeWindow,14) = rr.dfaintercept';
+globalfeatures(1:numTimeWindow,15) = rr.dfaslopeT';
+globalfeatures(1:numTimeWindow,16) = rr.dfainterceptT';
+globalfeatures(1:numTimeWindow,17) = rr.alpha1';
+globalfeatures(1:numTimeWindow,18) = rr.alpha2';
+globalfeatures(1:numTimeWindow,19) = rr.alpha3';
+globalfeatures(1:numTimeWindow,20) = rr.P11';
+globalfeatures(1:numTimeWindow,21) = rr.P12';
+globalfeatures(1:numTimeWindow,22) = rr.P13';
+globalfeatures(1:numTimeWindow,23) = rr.freq1';
+globalfeatures(1:numTimeWindow,24) = rr.freq2';
+globalfeatures(1:numTimeWindow,25) = rr.freq3';
+
+% Windowed Feautures: Used to classify sleep stages of selected patient
+features(:,1) = rrtw.mean';
+features(:,2) = rrtw.std';
+features(:,3) = rrtw.CV';
+features(:,4) = rrtw.LF';
+features(:,5) = rrtw.HF';
+features(:,6) = rrtw.FreqmaxP';
+features(:,7) = rrtw.maxHFD';
+features(:,8) = rrtw.LFHFratio';
+features(:,9) = rrtw.inter';
+features(:,10) = rrtw.H';
+features(:,11) = rrtw.pval951';
+features(:,12) = rrtw.pval952';
+features(:,13) = rrtw.dfaslope';
+features(:,14) = rrtw.dfaintercept';
+features(:,15) = rrtw.dfaslopeT';
+features(:,16) = rrtw.dfainterceptT';
+features(:,17) = rrtw.alpha1';
+features(:,18) = rrtw.alpha2';
+features(:,19) = rrtw.alpha3';
+features(:,20) = rrtw.P11';
+features(:,21) = rrtw.P12';
+features(:,22) = rrtw.P13';
+features(:,23) = rrtw.freq1';
+features(:,24) = rrtw.freq2';
+features(:,25) = rrtw.freq3';
+% Please add more features here ...
+
+% Load binary class labels and multi-class labels
+labels = rrtw.labels';
+binarylabels = rrtw.binarylabels';
+
+svmbinarycl = fitcsvm(features,binarylabels,'KernelFunction','rbf','BoxConstraint',Inf,'ClassNames',[-1,1]);
+svmbinarycl2 = crossval(svmbinarycl);
+binarymisclass = kfoldLoss(svmbinarycl2,'mode','individual');   % 10-folds cross validation
+svmbinarymisclass = mean(binarymisclass);
+display(svmbinarymisclass);
+
+svmmulticl = fitcsvm(features,labels,'KernelFunction','rbf','BoxConstraint',Inf,'ClassNames',[-1,1]);
+svmmulticl2 = crossval(svmmulticl);
+multimisclass = kfoldLoss(svmmulticl2,'mode','individual');   % 10-folds cross validation
+svmmultimisclass = mean(multimisclass);
+display(svmmultimisclass);
 
 
 

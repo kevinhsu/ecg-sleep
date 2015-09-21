@@ -16,5 +16,3 @@ end
 
 hrv = hrvtemp;
 locs = locstemp;
-figure
-plot(locs, hrv)
