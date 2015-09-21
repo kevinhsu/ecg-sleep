@@ -1,11 +1,5 @@
-%% Database
-db1 = '/slpdb/slp01a';
-db2 = '/slpdb/slp02b';
-db3 = '/slpdb/slp01b';
-db4 = '/slpdb/slp04';
-
 %% Configuration
-db = db4;
+db = '/slpdb/slp04';
 display(db);
 [~,config]=wfdbloadlib;
 echo off
@@ -15,7 +9,13 @@ warning off
 display('Reading samples ECG signal from MIT-BIH Arrhythmia Database');
 [siginfo,Fs] = wfdbdesc(db);
 Fs = Fs(1); % Sampling Frequency
-[tm, signal]=rdsamp(db,1);
+LengthSamples = siginfo.LengthSamples;
+
+if LengthSamples > 1800000  % Avoid overflow. The maximum sampling lenght is 2 hours
+    LengthSamples = 1800000;
+end
+
+[tm, signal] = rdsamp(db,[1],LengthSamples);
 ecg = signal(:,1);
 ecg = cmddenoise(ecg,'db1',4); % Wavelet Shrinkage Denoise
 ecg = ecg';
@@ -139,7 +139,7 @@ for i = 1:numTimeWindow
     rrtw.locs = rrtw.locs';
     
     % No Available Time Window
-    if isempty(rrtw.hrv)
+    if isempty(rrtw.hrv) || length(rrtw.hrv) == 1
        rrtw.mean(i) = rrtw.mean(i-1);
        rrtw.std(i) = rrtw.std(i-1);
        rrtw.CV(i) = rrtw.CV(i-1);
@@ -357,14 +357,21 @@ features(:,27) = rrtw.freq2';
 features(:,28) = rrtw.freq3';
 % Please add more features here ...
 
-% Normailzation
-features = mapminmax(features', 0, 1);
-features = features';
-
 % Load binary class labels and multi-class labels
 labels = rrtw.labels';
 binarylabels = rrtw.binarylabels';
 
+% Write Features and Labels in .txt files
+save 'globlefeatures.txt' globalfeatures -ascii
+save 'features.txt' features -ascii
+save 'labels.txt' labels -ascii
+save 'binarylabels.txt' binarylabels -ascii;
+
+% Normailzation
+features = mapminmax(features', 0, 1);
+features = features';
+
+% Superivised Learning
 svmbinarycl = fitcsvm(features,binarylabels,'KernelFunction','rbf','BoxConstraint',Inf,'ClassNames',[-1,1]);
 svmbinarycl2 = crossval(svmbinarycl);
 binarymisclass = kfoldLoss(svmbinarycl2,'mode','individual');   % 10-folds cross validation
@@ -376,6 +383,43 @@ svmmulticl2 = crossval(svmmulticl);
 multimisclass = kfoldLoss(svmmulticl2,'mode','individual');   % 10-folds cross validation
 svmmultimisclass = mean(multimisclass);
 display(svmmultimisclass);
+
+% Unsupervised Learning for 2 Clusteriing
+[u centroid] = kmeans(features, 2);
+u = u';
+temp = unique(u);
+count = 0;
+
+for i = 1:length(u)
+    if u(i) == temp(1)
+        u(i) = 1;
+    else
+        u(i) = -1;
+    end
+    if u(i) == binarylabels(i)
+        count = count + 1;
+    end
+end
+
+kmeansbinarymisclass1 = (length(u) - count) ./ length(u);
+count = 0;
+
+for i = 1:length(u)
+    if u(i) == temp(1)
+        u(i) = -1;
+    else
+        u(i) = 1;
+    end
+    if u(i) == binarylabels(i)
+        count = count + 1;
+    end    
+end
+
+kmeansbinarymisclass2 = (length(u) - count) ./ length(u);
+kmeansbinarymisclass = min(kmeansbinarymisclass1, kmeansbinarymisclass2);
+display(kmeansbinarymisclass);
+
+
 
 
 
