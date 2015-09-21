@@ -5,7 +5,7 @@ db3 = '/slpdb/slp01b';
 db4 = '/slpdb/slp04';
 
 %% Configuration
-db = db3;
+db = db4;
 display(db);
 [~,config]=wfdbloadlib;
 echo off
@@ -42,7 +42,12 @@ plot(locs(2:m), hrv)
 display('Filtering Outlier');
 [hrv,locs] = filterOutlier(hrv,locs);
 figure
-plot(locs, hrv);
+plot(locs, hrv);hold on
+
+% Smoothing Data (No Improvements)
+% hrv = smooth(hrv);
+% hrv = hrv';
+% plot(locs, hrv);
 
 %% Global Feature Extraction
 display('Global Feature Extraction');
@@ -88,11 +93,14 @@ end
 
 % Piecewise Detrended Fluctuation Analysis
 if length(d) > 1
-    [rr.alpha1, rr.alpha2, rr.alpha3] = dfapiece(d,p);
+    [rr.alpha1, rr.alpha2, rr.alpha3, rr.alpha1flag, rr.alpha2flag, rr.alpha3flag] = dfapiece(d,p);
 else
     rr.alpha1 = 0;
     rr.alpha2 = 0;
     rr.alpha3 = 0;
+    rr.alpha1flag = 0;
+    rr.alpha2flag = 0;
+    rr.alpha3flag = 0;
 end
 
 % Fast Fourier Transformation
@@ -190,11 +198,14 @@ for i = 1:numTimeWindow
     
     % Piecewise Detrended Fluctuation Analysis
     if length(d) > 1
-        [rrtw.alpha1(i), rrtw.alpha2(i), rrtw.alpha3(i)] = dfapiece(d,p);
+        [rrtw.alpha1(i), rrtw.alpha2(i), rrtw.alpha3(i), rrtw.alpha1flag(i), rrtw.alpha2flag(i), rrtw.alpha3flag(i)] = dfapiece(d,p);
     else
         rrtw.alpha1(i) = 0;
         rrtw.alpha2(i) = 0;
         rrtw.alpha3(i) = 0;
+        rrtw.alpha1flag = 0;
+        rrtw.alpha2flag = 0;
+        rrtw.alpha3flag = 0;
     end
     
     % Fast Fourier Transformation
@@ -305,12 +316,15 @@ globalfeatures(1:numTimeWindow,16) = rr.dfainterceptT';
 globalfeatures(1:numTimeWindow,17) = rr.alpha1';
 globalfeatures(1:numTimeWindow,18) = rr.alpha2';
 globalfeatures(1:numTimeWindow,19) = rr.alpha3';
-globalfeatures(1:numTimeWindow,20) = rr.P11';
-globalfeatures(1:numTimeWindow,21) = rr.P12';
-globalfeatures(1:numTimeWindow,22) = rr.P13';
-globalfeatures(1:numTimeWindow,23) = rr.freq1';
-globalfeatures(1:numTimeWindow,24) = rr.freq2';
-globalfeatures(1:numTimeWindow,25) = rr.freq3';
+globalfeatures(1:numTimeWindow,20) = rr.alpha1flag';
+globalfeatures(1:numTimeWindow,21) = rr.alpha2flag';
+globalfeatures(1:numTimeWindow,22) = rr.alpha3flag';
+globalfeatures(1:numTimeWindow,23) = rr.P11';
+globalfeatures(1:numTimeWindow,24) = rr.P12';
+globalfeatures(1:numTimeWindow,25) = rr.P13';
+globalfeatures(1:numTimeWindow,26) = rr.freq1';
+globalfeatures(1:numTimeWindow,27) = rr.freq2';
+globalfeatures(1:numTimeWindow,28) = rr.freq3';
 
 % Windowed Feautures: Used to classify sleep stages of selected patient
 features(:,1) = rrtw.mean';
@@ -332,13 +346,20 @@ features(:,16) = rrtw.dfainterceptT';
 features(:,17) = rrtw.alpha1';
 features(:,18) = rrtw.alpha2';
 features(:,19) = rrtw.alpha3';
-features(:,20) = rrtw.P11';
-features(:,21) = rrtw.P12';
-features(:,22) = rrtw.P13';
-features(:,23) = rrtw.freq1';
-features(:,24) = rrtw.freq2';
-features(:,25) = rrtw.freq3';
+features(:,20) = rrtw.alpha1flag';
+features(:,21) = rrtw.alpha2flag';
+features(:,22) = rrtw.alpha3flag';
+features(:,23) = rrtw.P11';
+features(:,24) = rrtw.P12';
+features(:,25) = rrtw.P13';
+features(:,26) = rrtw.freq1';
+features(:,27) = rrtw.freq2';
+features(:,28) = rrtw.freq3';
 % Please add more features here ...
+
+% Normailzation
+features = mapminmax(features', 0, 1);
+features = features';
 
 % Load binary class labels and multi-class labels
 labels = rrtw.labels';
