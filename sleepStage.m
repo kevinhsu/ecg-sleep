@@ -1,5 +1,5 @@
 %% Configuration
-db = '/slpdb/slp61';
+db = '/slpdb/slp01a';
 display(db);
 [~,config]=wfdbloadlib;
 echo off
@@ -173,7 +173,18 @@ for i = 1:numTimeWindow
             rrtw.dfaintercept(i) = rrtw.dfaintercept(i-1);
             rrtw.dfaslopeT(i) = rrtw.dfaslopeT(i-1);
             rrtw.dfainterceptT(i) = rrtw.dfainterceptT(i-1);
-            
+            rrtw.alpha1(i) = rrtw.alpha1(i-1);
+            rrtw.alpha2(i) = rrtw.alpha2(i-1);
+            rrtw.alpha3(i) = rrtw.alpha3(i-1);
+            rrtw.alpha1flag(i) = rrtw.alpha1flag(i-1);
+            rrtw.alpha2flag(i) = rrtw.alpha2flag(i-1);
+            rrtw.alpha3flag(i) = rrtw.alpha3flag(i-1);
+            rrtw.P11(i) = rrtw.P11(i-1);
+            rrtw.P12(i) = rrtw.P12(i-1);
+            rrtw.P13(i) = rrtw.P13(i-1);
+            rrtw.freq1(i) = rrtw.freq1(i-1);
+            rrtw.freq2(i) = rrtw.freq2(i-1);
+            rrtw.freq3(i) = rrtw.freq3(i-1);
         else
             rrtw.mean(i) = 0;
             rrtw.std(i) = 0;
@@ -191,6 +202,19 @@ for i = 1:numTimeWindow
             rrtw.dfaintercept(i) = 0;
             rrtw.dfaslopeT(i) = 0;
             rrtw.dfainterceptT(i) = 0;
+            rrtw.alpha1flag(i) = rrtw.alpha1flag(i-1);
+            rrtw.alpha1(i) = 0;
+            rrtw.alpha2(i) = 0;
+            rrtw.alpha3(i) = 0;
+            rrtw.alpha1flag(i) = 0;
+            rrtw.alpha2flag(i) = 0;
+            rrtw.alpha3flag(i) = 0;
+            rrtw.P11(i) = 0;
+            rrtw.P12(i) = 0;
+            rrtw.P13(i) = 0;
+            rrtw.freq1(i) = 0;
+            rrtw.freq2(i) = 0;
+            rrtw.freq3(i) = 0;
         end
         
         continue;
@@ -251,9 +275,9 @@ for i = 1:numTimeWindow
         rrtw.alpha1(i) = 0;
         rrtw.alpha2(i) = 0;
         rrtw.alpha3(i) = 0;
-        rrtw.alpha1flag = 0;
-        rrtw.alpha2flag = 0;
-        rrtw.alpha3flag = 0;
+        rrtw.alpha1flag(i) = 0;
+        rrtw.alpha2flag(i) = 0;
+        rrtw.alpha3flag(i) = 0;
     end
     
     % Fast Fourier Transformation
@@ -353,7 +377,7 @@ end
 rrtw.labels =  rrtw.labels';
 rrtw.binarylabels = rrtw.binarylabels';
 
-%% k-folds Cross Validation
+%% K-folds Cross Validation
 display('k-folds Cross Validation');
 globalfeatures = [];
 features = [];
@@ -361,64 +385,65 @@ labels = [];
 binarylabels = [];
 
 % Global Features: Used to match the most similar patient in database
-globalfeatures(1:numTimeWindow,1) = rr.mean';
-globalfeatures(1:numTimeWindow,2) = rr.std';
-globalfeatures(1:numTimeWindow,3) = rr.CV';
-globalfeatures(1:numTimeWindow,4) = rr.LF';
-globalfeatures(1:numTimeWindow,5) = rr.HF';
-globalfeatures(1:numTimeWindow,6) = rr.FreqmaxP';
-globalfeatures(1:numTimeWindow,7) = rr.maxHFD';
-globalfeatures(1:numTimeWindow,8) = rr.LFHFratio';
-globalfeatures(1:numTimeWindow,9) = rr.inter';
-globalfeatures(1:numTimeWindow,10) = rr.H';
-globalfeatures(1:numTimeWindow,11) = rr.pval951';
-globalfeatures(1:numTimeWindow,12) = rr.pval952';
-globalfeatures(1:numTimeWindow,13) = rr.dfaslope';
-globalfeatures(1:numTimeWindow,14) = rr.dfaintercept';
-globalfeatures(1:numTimeWindow,15) = rr.dfaslopeT';
-globalfeatures(1:numTimeWindow,16) = rr.dfainterceptT';
-globalfeatures(1:numTimeWindow,17) = rr.alpha1';
-globalfeatures(1:numTimeWindow,18) = rr.alpha2';
-globalfeatures(1:numTimeWindow,19) = rr.alpha3';
-globalfeatures(1:numTimeWindow,20) = rr.alpha1flag';
-globalfeatures(1:numTimeWindow,21) = rr.alpha2flag';
-globalfeatures(1:numTimeWindow,22) = rr.alpha3flag';
-globalfeatures(1:numTimeWindow,23) = rr.P11';
-globalfeatures(1:numTimeWindow,24) = rr.P12';
-globalfeatures(1:numTimeWindow,25) = rr.P13';
-globalfeatures(1:numTimeWindow,26) = rr.freq1';
-globalfeatures(1:numTimeWindow,27) = rr.freq2';
-globalfeatures(1:numTimeWindow,28) = rr.freq3';
+globalfeatures(1:numTimeWindow,end+1) = rr.mean';
+globalfeatures(1:numTimeWindow,end+1) = rr.std';
+globalfeatures(1:numTimeWindow,end+1) = rr.CV';
+globalfeatures(1:numTimeWindow,end+1) = rr.LF';
+globalfeatures(1:numTimeWindow,end+1) = rr.HF';
+globalfeatures(1:numTimeWindow,end+1) = rr.FreqmaxP';
+globalfeatures(1:numTimeWindow,end+1) = rr.maxHFD';
+globalfeatures(1:numTimeWindow,end+1) = rr.LFHFratio';
+globalfeatures(1:numTimeWindow,end+1) = rr.inter';
+globalfeatures(1:numTimeWindow,end+1) = rr.H';
+globalfeatures(1:numTimeWindow,end+1) = rr.pval951';
+globalfeatures(1:numTimeWindow,end+1) = rr.pval952';
+globalfeatures(1:numTimeWindow,end+1) = rr.dfaslope';
+globalfeatures(1:numTimeWindow,end+1) = rr.dfaintercept';
+globalfeatures(1:numTimeWindow,end+1) = rr.dfaslopeT';
+globalfeatures(1:numTimeWindow,end+1) = rr.dfainterceptT';
+globalfeatures(1:numTimeWindow,end+1) = rr.alpha1';
+globalfeatures(1:numTimeWindow,end+1) = rr.alpha2';
+globalfeatures(1:numTimeWindow,end+1) = rr.alpha3';
+% globalfeatures(1:numTimeWindow,end+1) = rr.alpha1flag';
+% globalfeatures(1:numTimeWindow,end+1) = rr.alpha2flag';
+% globalfeatures(1:numTimeWindow,end+1) = rr.alpha3flag';
+globalfeatures(1:numTimeWindow,end+1) = rr.P11';
+globalfeatures(1:numTimeWindow,end+1) = rr.P12';
+globalfeatures(1:numTimeWindow,end+1) = rr.P13';
+globalfeatures(1:numTimeWindow,end+1) = rr.freq1';
+globalfeatures(1:numTimeWindow,end+1) = rr.freq2';
+globalfeatures(1:numTimeWindow,end+1) = rr.freq3';
+% Please add more features here ...
 
 % Windowed Feautures: Used to classify sleep stages of selected patient
-features(:,1) = rrtw.mean';
-features(:,2) = rrtw.std';
-features(:,3) = rrtw.CV';
-features(:,4) = rrtw.LF';
-features(:,5) = rrtw.HF';
-features(:,6) = rrtw.FreqmaxP';
-features(:,7) = rrtw.maxHFD';
-features(:,8) = rrtw.LFHFratio';
-features(:,9) = rrtw.inter';
-features(:,10) = rrtw.H';
-features(:,11) = rrtw.pval951';
-features(:,12) = rrtw.pval952';
-features(:,13) = rrtw.dfaslope';
-features(:,14) = rrtw.dfaintercept';
-features(:,15) = rrtw.dfaslopeT';
-features(:,16) = rrtw.dfainterceptT';
-features(:,17) = rrtw.alpha1';
-features(:,18) = rrtw.alpha2';
-features(:,19) = rrtw.alpha3';
-features(:,20) = rrtw.alpha1flag';
-features(:,21) = rrtw.alpha2flag';
-features(:,22) = rrtw.alpha3flag';
-features(:,23) = rrtw.P11';
-features(:,24) = rrtw.P12';
-features(:,25) = rrtw.P13';
-features(:,26) = rrtw.freq1';
-features(:,27) = rrtw.freq2';
-features(:,28) = rrtw.freq3';
+features(:,end+1) = rrtw.mean';
+features(:,end+1) = rrtw.std';
+features(:,end+1) = rrtw.CV';
+features(:,end+1) = rrtw.LF';
+features(:,end+1) = rrtw.HF';
+features(:,end+1) = rrtw.FreqmaxP';
+features(:,end+1) = rrtw.maxHFD';
+features(:,end+1) = rrtw.LFHFratio';
+features(:,end+1) = rrtw.inter';
+features(:,end+1) = rrtw.H';
+features(:,end+1) = rrtw.pval951';
+features(:,end+1) = rrtw.pval952';
+features(:,end+1) = rrtw.dfaslope';
+features(:,end+1) = rrtw.dfaintercept';
+features(:,end+1) = rrtw.dfaslopeT';
+features(:,end+1) = rrtw.dfainterceptT';
+features(:,end+1) = rrtw.alpha1';
+features(:,end+1) = rrtw.alpha2';
+features(:,end+1) = rrtw.alpha3';
+% features(:,end+1) = rrtw.alpha1flag';
+% features(:,end+1) = rrtw.alpha2flag';
+% features(:,end+1) = rrtw.alpha3flag';
+features(:,end+1) = rrtw.P11';
+features(:,end+1) = rrtw.P12';
+features(:,end+1) = rrtw.P13';
+features(:,end+1) = rrtw.freq1';
+features(:,end+1) = rrtw.freq2';
+features(:,end+1) = rrtw.freq3';
 % Please add more features here ...
 
 % Load binary class labels and multi-class labels
